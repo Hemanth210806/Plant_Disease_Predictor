@@ -1,7 +1,6 @@
 Flask>=3.0.0
 Pillow>=10.0.0
 Werkzeug>=3.0.0
-tensorflow>=2.15.0
+tensorflow-cpu
 requests>=2.31.0
 gunicorn>=21.0.0
-waitress>=3.0.0
