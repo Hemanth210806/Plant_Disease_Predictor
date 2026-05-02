@@ -1,0 +1,7 @@
+Flask==3.0.3
+Pillow==10.3.0
+Werkzeug==3.0.2
+tensorflow==2.16.1
+requests==2.31.0
+gunicorn==21.2.0
+waitress==3.0.0

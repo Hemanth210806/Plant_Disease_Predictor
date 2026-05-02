@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Disease Predictor (AI)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">🌿 PlantCare AI</div>
+        </header>
+
+        <main>
+            <section class="upload-section card">
+                <h1 id="uploadTitle">Diagnose Your Plant</h1>
+                <p id="uploadDesc">Upload a photo of a sick or healthy plant leaf to identify it using our deep learning model.</p>
+                
+                <div class="upload-area" id="dropZone">
+                    <input type="file" id="imageInput" accept=".jpg, .jpeg, .png" hidden>
+                    <label for="imageInput" class="upload-label">
+                        <div class="upload-icon">📸</div>
+                        <span id="uploadBtnText">Tap to Upload Image</span>
+                        <small id="uploadHint">JPG or PNG</small>
+                    </label>
+                </div>
+                
+                <div class="preview-area hidden" id="previewArea">
+                    <img id="imagePreview" src="" alt="Image Preview">
+                    <button class="btn-secondary" id="changeImageBtn">Change Image</button>
+                    <button class="btn-primary" id="predictBtn">Analyze Leaf</button>
+                </div>
+                
+                <div class="loading-state hidden" id="loadingState">
+                    <div class="spinner"></div>
+                    <p id="analyzingText">Analyzing leaf structure...</p>
+                </div>
+            </section>
+
+            <section class="results-section hidden" id="resultsSection">
+                <div class="result-header">
+                    <h2>Diagnosis Result</h2>
+                </div>
+                
+                <div class="disease-title-card" id="mainResultCard">
+                    <h3>Top Prediction</h3>
+                    <h2 id="diseaseName">Apple Black Rot</h2>
+                    <div class="confidence-badge" id="confidenceValueBadge">
+                        <span id="confidenceValue">98%</span> Confidence
+                    </div>
+                </div>
+
+                <div class="top2-container hidden" id="top2Container">
+                    <h4>Second Most Likely</h4>
+                    <div class="top2-card">
+                        <span id="top2DiseaseName">Apple Scab</span>
+                        <span class="top2-confidence" id="top2ConfidenceValue">5%</span>
+                    </div>
+                </div>
+
+                <div class="remedies-wrapper hidden" id="remediesWrapper">
+                    <button class="btn-secondary toggle-remedies-btn" id="toggleRemediesBtn">Show Treatment Plan</button>
+                    
+                    <div class="remedies-container hidden" id="remediesContainer">
+                        <div class="remedy-card immediate-action">
+                            <div class="remedy-icon">🚨</div>
+                            <div class="remedy-content">
+                                <h4>Immediate Action</h4>
+                                <p id="remImmediate">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="remedy-card organic-solution">
+                            <div class="remedy-icon">🌱</div>
+                            <div class="remedy-content">
+                                <h4>Organic Solution</h4>
+                                <p id="remOrganic">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="remedy-card chemical-solution">
+                            <div class="remedy-icon">🧪</div>
+                            <div class="remedy-content">
+                                <h4>Chemical Solution</h4>
+                                <p id="remChemical">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn-primary" id="newDiagnosisBtn">New Diagnosis</button>
+                </div>
+            </section>
+            
+            <div class="error-toast hidden" id="errorToast"></div>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
