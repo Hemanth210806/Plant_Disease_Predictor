@@ -25,7 +25,7 @@ try:
 except ImportError:
     TF_AVAILABLE = False
 
-MODEL_PATH = 'model.keras'
+MODEL_WEIGHTS_PATH = 'model.weights.h5'
 CLASSES_PATH = 'classes.json'
 
 model = None
@@ -41,46 +41,40 @@ if TF_AVAILABLE:
         except Exception as e:
             print(f"Error loading classes: {e}")
 
-    # Then load Model
-    if os.path.exists(MODEL_PATH):
+    # Build and Load Model
+    if os.path.exists(MODEL_WEIGHTS_PATH):
         try:
-            print(f"DEBUG: Attempting to load model from {MODEL_PATH}...")
+            print(f"DEBUG: Rebuilding architecture and loading weights from {MODEL_WEIGHTS_PATH}...")
             # Clear any existing session to free RAM
             tf.keras.backend.clear_session()
-            # Use compile=False to avoid issues with custom optimizers or metrics during loading
-            model = tf.keras.models.load_model(MODEL_PATH, compile=False)
-            print(f"SUCCESS: Model loaded successfully from {MODEL_PATH}")
+            
+            img_height = 224
+            img_width = 224
+            
+            # Rebuild the EXACT Functional architecture
+            inputs = tf.keras.Input(shape=(img_height, img_width, 3))
+            x = tf.keras.layers.Rescaling(1./255.)(inputs)
+            
+            base_model = tf.keras.applications.MobileNetV2(
+                input_shape=(img_height, img_width, 3),
+                include_top=False,
+                weights=None
+            )
+            
+            x = base_model(x)
+            x = tf.keras.layers.GlobalAveragePooling2D()(x)
+            x = tf.keras.layers.Dense(128, activation='relu')(x)
+            outputs = tf.keras.layers.Dense(len(class_names), activation='softmax')(x)
+            
+            model = tf.keras.Model(inputs, outputs)
+            
+            # Load the intelligence (weights)
+            model.load_weights(MODEL_WEIGHTS_PATH)
+            print(f"SUCCESS: Model weights loaded successfully from {MODEL_WEIGHTS_PATH}")
+            
         except Exception as e:
-            print(f"WARNING: Direct model load failed. This is usually due to Keras version differences. Error: {e}")
-            print("INFO: Attempting to rebuild architecture manually to recover...")
-            try:
-                img_height = 224
-                img_width = 224
-                
-                # Create Functional architecture to match training
-                inputs = tf.keras.Input(shape=(img_height, img_width, 3))
-                # Normalization is often part of the model or done manually
-                x = tf.keras.layers.Rescaling(1./255)(inputs)
-                
-                base_model = tf.keras.applications.MobileNetV2(
-                    input_shape=(img_height, img_width, 3),
-                    include_top=False,
-                    weights=None
-                )
-                
-                x = base_model(x)
-                x = tf.keras.layers.GlobalAveragePooling2D()(x)
-                x = tf.keras.layers.Dense(128, activation='relu')(x)
-                outputs = tf.keras.layers.Dense(len(class_names), activation='softmax')(x)
-                
-                model = tf.keras.Model(inputs, outputs)
-                
-                print("INFO: Attempting to load weights into functional architecture...")
-                model.load_weights(MODEL_PATH)
-                print(f"SUCCESS: Model weights loaded successfully from {MODEL_PATH}")
-            except Exception as e2:
-                print(f"CRITICAL: Failed to load weights: {e2}")
-                model = None # Ensure it falls back to mock if everything fails
+            print(f"CRITICAL: Failed to load model weights: {e}")
+            model = None 
 
 def format_disease_name(raw_name):
     # e.g., "apple_black_rot" -> "Apple Black Rot"
