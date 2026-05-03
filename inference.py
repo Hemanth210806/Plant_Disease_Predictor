@@ -3,10 +3,18 @@ import json
 import time
 from PIL import Image
 import io
+import gc
+
+# Memory Optimization for Render Free Tier (512MB RAM)
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1' # Force CPU only
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 
 try:
     import tensorflow as tf
     import numpy as np
+    # Disable GPU devices explicitly
+    tf.config.set_visible_devices([], 'GPU')
     TF_AVAILABLE = True
 except ImportError:
     TF_AVAILABLE = False
@@ -86,24 +94,23 @@ def predict_disease(image_bytes):
             top_1_idx = top_indices[0]
             top_1_conf = float(predictions[top_1_idx])
             
-            # Check for unknown
+            # Format successful prediction or Unknown
             if top_1_conf < 0.5:
-                return {
+                result = {
                     'disease': 'Unknown Disease / Not a Leaf',
                     'confidence': round(top_1_conf * 100, 2),
                     'is_unknown': True
                 }
-            
-            # Format successful prediction
-            top_1_name = format_disease_name(class_names[top_1_idx])
-            result = {
-                'disease': top_1_name,
-                'confidence': round(top_1_conf * 100, 2),
-                'is_unknown': False
-            }
+            else:
+                top_1_name = format_disease_name(class_names[top_1_idx])
+                result = {
+                    'disease': top_1_name,
+                    'confidence': round(top_1_conf * 100, 2),
+                    'is_unknown': False
+                }
             
             # Add top 2 if available
-            if len(top_indices) > 1:
+            if len(top_indices) > 1 and not result['is_unknown']:
                 top_2_idx = top_indices[1]
                 top_2_conf = float(predictions[top_2_idx])
                 top_2_name = format_disease_name(class_names[top_2_idx])
@@ -111,23 +118,24 @@ def predict_disease(image_bytes):
                     'disease': top_2_name,
                     'confidence': round(top_2_conf * 100, 2)
                 }
+            
+            # Cleanup large objects explicitly
+            del img
+            del img_array
+            del predictions
+            gc.collect()
                 
             return result
 
         except Exception as e:
             print(f"Prediction error: {e}")
+            gc.collect()
             pass
 
     # MOCK PREDICTION (Fallback if no model)
-    time.sleep(1.5)  # Simulate processing time
-    
-    # Simulate a fake prediction
+    time.sleep(1.5)
     return {
-        'disease': 'Apple Black Rot (Mock)',
-        'confidence': 92.4,
-        'is_unknown': False,
-        'top_2': {
-            'disease': 'Apple Scab (Mock)',
-            'confidence': 5.1
-        }
+        'disease': 'Potato Early Blight (Demo)',
+        'confidence': 98.2,
+        'is_unknown': False
     }
