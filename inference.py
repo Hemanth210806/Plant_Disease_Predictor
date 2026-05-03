@@ -44,6 +44,7 @@ if TF_AVAILABLE:
         except Exception as e:
             print(f"WARNING: Direct model load failed: {e}")
             print("INFO: Attempting to rebuild architecture and load weights...")
+            try:
                 img_height = 224
                 img_width = 224
                 
