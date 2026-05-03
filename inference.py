@@ -39,11 +39,12 @@ if TF_AVAILABLE:
     if os.path.exists(MODEL_PATH):
         try:
             print(f"DEBUG: Attempting to load model from {MODEL_PATH}...")
-            model = tf.keras.models.load_model(MODEL_PATH)
+            # Use compile=False to avoid issues with custom optimizers or metrics during loading
+            model = tf.keras.models.load_model(MODEL_PATH, compile=False)
             print(f"SUCCESS: Model loaded successfully from {MODEL_PATH}")
         except Exception as e:
-            print(f"WARNING: Direct model load failed: {e}")
-            print("INFO: Attempting to rebuild architecture and load weights...")
+            print(f"WARNING: Direct model load failed. This is usually due to Keras version differences. Error: {e}")
+            print("INFO: Attempting to rebuild architecture manually to recover...")
             try:
                 img_height = 224
                 img_width = 224
