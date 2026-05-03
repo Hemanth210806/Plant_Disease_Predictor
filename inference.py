@@ -37,7 +37,16 @@ if os.path.exists(ONNX_PATH):
         print(f"CRITICAL: Failed to load ONNX model: {e}")
 
 def format_disease_name(raw_name):
-    return " ".join(word.capitalize() for word in raw_name.split('_') if word)
+    # e.g., "Tomato___Tomato_Yellow_Leaf_Curl_Virus" -> "Tomato Yellow Leaf Curl Virus"
+    words = raw_name.replace('___', '_').split('_')
+    # Remove duplicates while preserving order
+    seen = set()
+    unique_words = []
+    for w in words:
+        if w and w.lower() not in seen:
+            unique_words.append(w.capitalize())
+            seen.add(w.lower())
+    return " ".join(unique_words)
 
 def predict_disease(image_bytes):
     """
@@ -51,8 +60,9 @@ def predict_disease(image_bytes):
                 img = img.convert('RGB')
             img = img.resize((224, 224))
             
-            # Convert to numpy and normalize (Rescaling layer was 1/255)
-            img_array = np.array(img).astype(np.float32) / 255.0
+            # Convert to numpy (NO manual normalization here, 
+            # because the model has a Rescaling(1/255) layer built-in!)
+            img_array = np.array(img).astype(np.float32)
             img_array = np.expand_dims(img_array, axis=0) # Add batch dimension
             
             # 2. Predict
