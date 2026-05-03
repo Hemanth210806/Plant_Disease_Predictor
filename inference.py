@@ -5,7 +5,8 @@ from PIL import Image
 import io
 import gc
 
-# Memory Optimization for Render Free Tier (512MB RAM)
+# --- LINUX MEMORY HACKS FOR RENDER (512MB RAM) ---
+os.environ['MALLOC_ARENA_MAX'] = '2' # Prevents memory hoarding
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1' # Force CPU only
 os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
@@ -13,6 +14,11 @@ os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
 try:
     import tensorflow as tf
     import numpy as np
+    
+    # LIMIT THREADS TO SAVE RAM
+    tf.config.threading.set_intra_op_parallelism_threads(1)
+    tf.config.threading.set_inter_op_parallelism_threads(1)
+    
     # Disable GPU devices explicitly
     tf.config.set_visible_devices([], 'GPU')
     TF_AVAILABLE = True
@@ -39,6 +45,8 @@ if TF_AVAILABLE:
     if os.path.exists(MODEL_PATH):
         try:
             print(f"DEBUG: Attempting to load model from {MODEL_PATH}...")
+            # Clear any existing session to free RAM
+            tf.keras.backend.clear_session()
             # Use compile=False to avoid issues with custom optimizers or metrics during loading
             model = tf.keras.models.load_model(MODEL_PATH, compile=False)
             print(f"SUCCESS: Model loaded successfully from {MODEL_PATH}")
