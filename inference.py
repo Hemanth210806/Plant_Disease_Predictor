@@ -4,89 +4,46 @@ import time
 from PIL import Image
 import io
 import gc
+import numpy as np
+import onnxruntime as ort
 
-# --- LINUX MEMORY HACKS FOR RENDER (512MB RAM) ---
-os.environ['MALLOC_ARENA_MAX'] = '2' # Prevents memory hoarding
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1' # Force CPU only
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-
-try:
-    import tensorflow as tf
-    import numpy as np
-    
-    # LIMIT THREADS TO SAVE RAM
-    tf.config.threading.set_intra_op_parallelism_threads(1)
-    tf.config.threading.set_inter_op_parallelism_threads(1)
-    
-    # Disable GPU devices explicitly
-    tf.config.set_visible_devices([], 'GPU')
-    TF_AVAILABLE = True
-except ImportError:
-    TF_AVAILABLE = False
-
-MODEL_WEIGHTS_PATH = 'model.weights.h5'
+# Configuration
+ONNX_PATH = 'model.onnx'
 CLASSES_PATH = 'classes.json'
 
-model = None
+# Initialize session
+session = None
 class_names = []
 
-# Load Classes first
-if TF_AVAILABLE:
-    if os.path.exists(CLASSES_PATH):
-        try:
-            with open(CLASSES_PATH, 'r') as f:
-                class_names = json.load(f)
-            print(f"Successfully loaded {len(class_names)} classes.")
-        except Exception as e:
-            print(f"Error loading classes: {e}")
+if os.path.exists(CLASSES_PATH):
+    try:
+        with open(CLASSES_PATH, 'r') as f:
+            class_names = json.load(f)
+        print(f"Successfully loaded {len(class_names)} classes.")
+    except Exception as e:
+        print(f"Error loading classes: {e}")
 
-    # Build and Load Model
-    if os.path.exists(MODEL_WEIGHTS_PATH):
-        try:
-            print(f"DEBUG: Rebuilding architecture and loading weights from {MODEL_WEIGHTS_PATH}...")
-            # Clear any existing session to free RAM
-            tf.keras.backend.clear_session()
-            
-            img_height = 224
-            img_width = 224
-            
-            # Rebuild the EXACT Functional architecture
-            inputs = tf.keras.Input(shape=(img_height, img_width, 3))
-            x = tf.keras.layers.Rescaling(1./255.)(inputs)
-            
-            base_model = tf.keras.applications.MobileNetV2(
-                input_shape=(img_height, img_width, 3),
-                include_top=False,
-                weights=None
-            )
-            
-            x = base_model(x)
-            x = tf.keras.layers.GlobalAveragePooling2D()(x)
-            x = tf.keras.layers.Dense(128, activation='relu')(x)
-            outputs = tf.keras.layers.Dense(len(class_names), activation='softmax')(x)
-            
-            model = tf.keras.Model(inputs, outputs)
-            
-            # Load the intelligence (weights)
-            model.load_weights(MODEL_WEIGHTS_PATH)
-            print(f"SUCCESS: Model weights loaded successfully from {MODEL_WEIGHTS_PATH}")
-            
-        except Exception as e:
-            print(f"CRITICAL: Failed to load model weights: {e}")
-            model = None 
+if os.path.exists(ONNX_PATH):
+    try:
+        print(f"DEBUG: Loading ONNX model from {ONNX_PATH}...")
+        # Force CPU usage and limit threads to save RAM
+        sess_options = ort.SessionOptions()
+        sess_options.intra_op_num_threads = 1
+        sess_options.inter_op_num_threads = 1
+        
+        session = ort.InferenceSession(ONNX_PATH, sess_options, providers=['CPUExecutionProvider'])
+        print(f"SUCCESS: ONNX model loaded successfully.")
+    except Exception as e:
+        print(f"CRITICAL: Failed to load ONNX model: {e}")
 
 def format_disease_name(raw_name):
-    # e.g., "apple_black_rot" -> "Apple Black Rot"
     return " ".join(word.capitalize() for word in raw_name.split('_') if word)
 
 def predict_disease(image_bytes):
     """
-    Predicts the disease from an image.
-    Returns the top 2 predictions.
-    If the top confidence is < 0.5, returns "Unknown".
+    Predicts the disease from an image using ONNX Runtime.
     """
-    if model is not None and class_names:
+    if session is not None and class_names:
         try:
             # 1. Preprocess the image
             img = Image.open(io.BytesIO(image_bytes))
@@ -94,11 +51,13 @@ def predict_disease(image_bytes):
                 img = img.convert('RGB')
             img = img.resize((224, 224))
             
-            img_array = tf.keras.preprocessing.image.img_to_array(img)
-            img_array = np.expand_dims(img_array, axis=0)
+            # Convert to numpy and normalize (Rescaling layer was 1/255)
+            img_array = np.array(img).astype(np.float32) / 255.0
+            img_array = np.expand_dims(img_array, axis=0) # Add batch dimension
             
-            # 2. Predict (Rescaling is handled by the model's first layer)
-            predictions = model.predict(img_array, verbose=0)[0]
+            # 2. Predict
+            input_name = session.get_inputs()[0].name
+            predictions = session.run(None, {input_name: img_array})[0][0]
             
             # 3. Get top 2 indices
             top_indices = np.argsort(predictions)[-2:][::-1]
@@ -106,7 +65,7 @@ def predict_disease(image_bytes):
             top_1_idx = top_indices[0]
             top_1_conf = float(predictions[top_1_idx])
             
-            # Format successful prediction or Unknown
+            # Format results
             if top_1_conf < 0.5:
                 result = {
                     'disease': 'Unknown Disease / Not a Leaf',
@@ -121,7 +80,6 @@ def predict_disease(image_bytes):
                     'is_unknown': False
                 }
             
-            # Add top 2 if available
             if len(top_indices) > 1 and not result['is_unknown']:
                 top_2_idx = top_indices[1]
                 top_2_conf = float(predictions[top_2_idx])
@@ -131,10 +89,9 @@ def predict_disease(image_bytes):
                     'confidence': round(top_2_conf * 100, 2)
                 }
             
-            # Cleanup large objects explicitly
+            # Cleanup
             del img
             del img_array
-            del predictions
             gc.collect()
                 
             return result
@@ -142,10 +99,8 @@ def predict_disease(image_bytes):
         except Exception as e:
             print(f"Prediction error: {e}")
             gc.collect()
-            pass
 
-    # MOCK PREDICTION (Fallback if no model)
-    time.sleep(1.5)
+    # MOCK PREDICTION (Fallback)
     return {
         'disease': 'Potato Early Blight (Demo)',
         'confidence': 98.2,
