@@ -1,6 +1,6 @@
-Flask>=3.0.0
-Pillow>=10.0.0
-Werkzeug>=3.0.0
-tensorflow==2.15.0
-requests>=2.31.0
-gunicorn>=21.0.0
+flask==2.3.3
+pillow==10.0.0
+werkzeug==2.3.7
+tensorflow==2.12.0
+requests==2.31.0
+gunicorn==21.2.0

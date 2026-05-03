@@ -30,11 +30,12 @@ if TF_AVAILABLE:
     # Then load Model
     if os.path.exists(MODEL_PATH):
         try:
+            print(f"DEBUG: Attempting to load model from {MODEL_PATH}...")
             model = tf.keras.models.load_model(MODEL_PATH)
-            print(f"Successfully loaded model from {MODEL_PATH}")
+            print(f"SUCCESS: Model loaded successfully from {MODEL_PATH}")
         except Exception as e:
-            print(f"Error loading model directly: {e}")
-            print("Attempting to rebuild architecture and load weights...")
+            print(f"WARNING: Direct model load failed: {e}")
+            print("INFO: Attempting to rebuild architecture and load weights...")
             try:
                 img_height = 224
                 img_width = 224
