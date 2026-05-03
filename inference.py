@@ -44,25 +44,33 @@ if TF_AVAILABLE:
         except Exception as e:
             print(f"WARNING: Direct model load failed: {e}")
             print("INFO: Attempting to rebuild architecture and load weights...")
-            try:
                 img_height = 224
                 img_width = 224
+                
+                # Create Functional architecture to match training
+                inputs = tf.keras.Input(shape=(img_height, img_width, 3))
+                # Normalization is often part of the model or done manually
+                x = tf.keras.layers.Rescaling(1./255)(inputs)
+                
                 base_model = tf.keras.applications.MobileNetV2(
                     input_shape=(img_height, img_width, 3),
                     include_top=False,
                     weights=None
                 )
-                model = tf.keras.Sequential([
-                    tf.keras.layers.Rescaling(1./255, input_shape=(img_height, img_width, 3)),
-                    base_model,
-                    tf.keras.layers.GlobalAveragePooling2D(),
-                    tf.keras.layers.Dense(128, activation='relu'),
-                    tf.keras.layers.Dense(len(class_names), activation='softmax')
-                ])
+                
+                x = base_model(x)
+                x = tf.keras.layers.GlobalAveragePooling2D()(x)
+                x = tf.keras.layers.Dense(128, activation='relu')(x)
+                outputs = tf.keras.layers.Dense(len(class_names), activation='softmax')(x)
+                
+                model = tf.keras.Model(inputs, outputs)
+                
+                print("INFO: Attempting to load weights into functional architecture...")
                 model.load_weights(MODEL_PATH)
-                print(f"Successfully loaded model weights from {MODEL_PATH}")
+                print(f"SUCCESS: Model weights loaded successfully from {MODEL_PATH}")
             except Exception as e2:
-                print(f"Failed to load weights: {e2}")
+                print(f"CRITICAL: Failed to load weights: {e2}")
+                model = None # Ensure it falls back to mock if everything fails
 
 def format_disease_name(raw_name):
     # e.g., "apple_black_rot" -> "Apple Black Rot"
